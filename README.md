@@ -24,6 +24,7 @@ lending strategies on Arbitrum) and I'm transitioning into security research.
 | 2 | Fallout | Unprotected initialization | Ethernaut | [link](./ethernaut/02-Fallout.md) |
 | 3 | Reentrance | Reentrancy | Ethernaut | [link](./ethernaut/03-Reentrance.md) |
 | 4 | Unstoppable | ERC4626 vault DoS | Damn Vulnerable DeFi | [link](./damn-vulnerable-defi/01-Unstoppable.md) |
+| 5 | Naive Receiver | Flash-loan fee abuse + _msgSender spoofing | Damn Vulnerable DeFi | [link](./damn-vulnerable-defi/02-NaiveReceiver.md) |
 
 ## Running the exploits
 
