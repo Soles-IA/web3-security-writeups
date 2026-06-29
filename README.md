@@ -18,24 +18,31 @@ lending strategies on Arbitrum) and I'm transitioning into security research.
 
 ## Exercises
 
-| # | Exercise | Vulnerability class | Source |
-|---|----------|---------------------|--------|
-| 1 | Fallback | Weak access control | Ethernaut |
-| 2 | Fallout | Unprotected initialization | Ethernaut |
-| 3 | Reentrance | Reentrancy | Ethernaut |
-| 4 | Unstoppable | ERC4626 vault DoS | Damn Vulnerable DeFi |
+| # | Exercise | Vulnerability class | Source | Writeup |
+|---|----------|---------------------|--------|---------|
+| 1 | Fallback | Weak access control | Ethernaut | [link](./ethernaut/01-Fallback.md) |
+| 2 | Fallout | Unprotected initialization | Ethernaut | [link](./ethernaut/02-Fallout.md) |
+| 3 | Reentrance | Reentrancy | Ethernaut | [link](./ethernaut/03-Reentrance.md) |
+| 4 | Unstoppable | ERC4626 vault DoS | Damn Vulnerable DeFi | [link](./damn-vulnerable-defi/01-Unstoppable.md) |
 
 ## Running the exploits
 
-This is a Foundry project. To run the proof-of-concept exploits yourself:
+This is a Foundry project. The three Ethernaut exploits are runnable as tests:
 
 ```bash
-git clone https://github.com/Soles-IA/web3-security-writeups.git
+git clone --recurse-submodules https://github.com/Soles-IA/web3-security-writeups.git
 cd web3-security-writeups
-forge install foundry-rs/forge-std
 forge test -vv
 ```
 
 Each exploit is in `test/` and the vulnerable contract in `src/`. All three
 Ethernaut exploits pass, demonstrating the vulnerability described in the
-matching writeup.
+matching writeup. (The Unstoppable writeup is documented only; its exploit
+lives in the separate Damn Vulnerable DeFi project.)
+
+## Background
+
+Before focusing on security I built and deployed contracts on Arbitrum mainnet
+involving Balancer flash loans, Aave V3 (including eMode), and Uniswap V3 swaps.
+Debugging real reverts by reading call traces is what pulled me toward
+understanding *why* contracts fail — and from there, into security research.

