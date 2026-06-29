@@ -24,3 +24,18 @@ lending strategies on Arbitrum) and I'm transitioning into security research.
 | 2 | Fallout | Unprotected initialization | Ethernaut |
 | 3 | Reentrance | Reentrancy | Ethernaut |
 | 4 | Unstoppable | ERC4626 vault DoS | Damn Vulnerable DeFi |
+
+## Running the exploits
+
+This is a Foundry project. To run the proof-of-concept exploits yourself:
+
+```bash
+git clone https://github.com/Soles-IA/web3-security-writeups.git
+cd web3-security-writeups
+forge install foundry-rs/forge-std
+forge test -vv
+```
+
+Each exploit is in `test/` and the vulnerable contract in `src/`. All three
+Ethernaut exploits pass, demonstrating the vulnerability described in the
+matching writeup.
