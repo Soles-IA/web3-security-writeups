@@ -9,6 +9,16 @@ the exploit, and the fix a protocol should apply.
 I come from a hands-on DeFi background (deploying and debugging flash-loan and
 lending strategies on Arbitrum) and I'm transitioning into security research.
 
+## Audit Contests
+
+Beyond practice exercises, I participate in live audit contests on real production code.
+
+| Contest | Platform | Findings | Writeup |
+|---------|----------|----------|---------|
+| Snowman Merkle Airdrop | CodeHawks First Flight | 1 High (unlimited NFT minting), 1 Low (EIP-712 typehash typo) | [link](./contests/01-snowman-merkle-airdrop.md) |
+
+The High finding includes a runnable Foundry PoC demonstrating the double-claim via balance top-up.
+
 ## Methodology
 
 1. **Read** the contract and trace every place a sensitive variable or privilege is modified.
