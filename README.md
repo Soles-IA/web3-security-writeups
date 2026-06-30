@@ -27,6 +27,7 @@ lending strategies on Arbitrum) and I'm transitioning into security research.
 | 5 | Naive Receiver | Flash-loan fee abuse + _msgSender spoofing | Damn Vulnerable DeFi | [link](./damn-vulnerable-defi/02-NaiveReceiver.md) |
 | 6 | Truster | Arbitrary call / approve abuse | Damn Vulnerable DeFi | [link](./damn-vulnerable-defi/03-Truster.md) |
 | 7 | Side Entrance | Balance vs internal accounting mismatch | Damn Vulnerable DeFi | [link](./damn-vulnerable-defi/04-SideEntrance.md) |
+| 8 | The Rewarder | Double-spend via late state marking (batch) | Damn Vulnerable DeFi | [link](./damn-vulnerable-defi/05-TheRewarder.md) |
 
 ## Running the exploits
 
