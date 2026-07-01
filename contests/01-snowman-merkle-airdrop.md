@@ -60,3 +60,45 @@ actually enforced. The key insight on Finding 1 was rejecting the naive "claim
 twice in a row" idea (blocked by the balance check) and finding the real vector:
 balance top-up resets all conditions because there is no replay protection. Same
 class as a batch double-spend — state written but never checked.
+
+---
+
+## Finding 3 — [Medium] Global `s_earnTimer` causes protocol-wide DoS on earnSnow
+
+**Contract:** Snow.sol · **Function:** earnSnow
+
+### Description
+`earnSnow()` gates a 1-token-per-week free claim, but the cooldown `s_earnTimer`
+is a single contract-wide variable instead of a per-user mapping. When any user
+calls `earnSnow()`, the global timer resets for everyone, so a different user who
+never farmed is blocked for a week. Effectively only one user in the whole
+protocol can farm per week. Worsened by the fact that `buySnow()` also writes
+`s_earnTimer`, and `buySnow(0)` is free — an attacker can keep the timer fresh and
+permanently deny farming to all.
+
+### Proof of Concept
+A Foundry test confirms it: Alice farms, then Bob (a different address who never
+farmed) is immediately reverted with `S__Timer`.
+
+### Recommendation
+Make the cooldown per-user: `mapping(address => uint256) s_earnTimer`, keyed by
+`msg.sender`. Remove the `s_earnTimer` write from `buySnow()`.
+
+## Finding 4 — [Medium] buySnow traps user ETH when msg.value is non-exact
+
+**Contract:** Snow.sol · **Function:** buySnow
+
+### Description
+`buySnow` pays in ETH if `msg.value` exactly equals the price, otherwise charges
+WETH. If a user sends a non-zero `msg.value` that isn't exactly the price, they
+fall into the else branch: they are charged the full price in WETH **and** the ETH
+they sent stays trapped in the contract with no user refund path (only the
+collector can sweep it via `collectFee`). Double payment / direct loss of funds.
+
+### Proof of Concept
+A Foundry test confirms it: user approves WETH, calls `buySnow{value: 0.1 ether}(1)`,
+receives the token, is charged full WETH, and the 0.1 ETH is left stuck in the contract.
+
+### Recommendation
+Reject non-matching `msg.value` in the else branch (`require(msg.value == 0)`), or
+refund any unused native ETH at the end of the function.
