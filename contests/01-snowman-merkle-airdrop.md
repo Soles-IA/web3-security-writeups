@@ -102,3 +102,29 @@ receives the token, is charged full WETH, and the 0.1 ETH is left stuck in the c
 ### Recommendation
 Reject non-matching `msg.value` in the else branch (`require(msg.value == 0)`), or
 refund any unused native ETH at the end of the function.
+
+## Finding 5 — [High] mintSnowman has no access control
+
+**Contract:** Snowman.sol · **Function:** mintSnowman
+
+### Description
+Snowman NFTs are meant to be minted only by the SnowmanAirdrop contract after it
+verifies a claimer's Merkle proof, EIP-712 signature, and Snow balance. The
+contract even declares an `SM__NotAllowed()` error, signaling intent to restrict
+minting. But `mintSnowman` is `external` with no access control: no onlyOwner, no
+check that msg.sender is the airdrop, and the SM__NotAllowed error is never used.
+Any address can call it directly and mint arbitrary NFTs.
+
+### Impact
+High. Anyone can mint unlimited Snowman NFTs for free — no tokens, no proof, no
+signature — completely bypassing the airdrop and rendering the entire
+SnowmanAirdrop mechanism meaningless. Missing access control (OWASP #1).
+
+### Proof of Concept
+A Foundry test confirms it: an attacker with nothing calls
+`mintSnowman(attacker, 1000)` and receives 1000 NFTs.
+
+### Recommendation
+Restrict mintSnowman to the airdrop contract (or owner), enforcing it with the
+already-declared SM__NotAllowed() error:
+`if (msg.sender != i_airdrop) revert SM__NotAllowed();`
