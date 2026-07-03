@@ -128,3 +128,22 @@ A Foundry test confirms it: an attacker with nothing calls
 Restrict mintSnowman to the airdrop contract (or owner), enforcing it with the
 already-declared SM__NotAllowed() error:
 `if (msg.sender != i_airdrop) revert SM__NotAllowed();`
+
+## Finding 6 — [Low] collectFee uses unchecked transfer instead of safeTransfer
+
+**Contract:** Snow.sol · **Function:** collectFee
+
+### Description
+The contract declares `using SafeERC20 for IERC20` and uses safe patterns
+elsewhere, but `collectFee` calls `i_weth.transfer(...)` directly, ignoring the
+boolean return value. If WETH were a non-standard ERC20 that returns false on
+failure instead of reverting, the transfer would fail silently while collectFee
+reports success. Found on a second review pass.
+
+### Impact
+Low. Inconsistent with the contract's own SafeERC20 usage; a silent failure is
+possible only with non-standard tokens, but it's a real code-quality defect.
+
+### Recommendation
+Use `i_weth.safeTransfer(s_collector, collection)` (already available via the
+`using SafeERC20 for IERC20` declaration).
