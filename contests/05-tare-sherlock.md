@@ -85,6 +85,46 @@ zero-sum holds under 128k randomized sequences. Worth noting the `[D]` tag means
 *the contract* does not verify it at runtime — the team's own suite asserts it in
 28 tests via an `accountingEquationHolds` modifier.
 
+## Thinking like an attacker: the NAV under concurrency
+
+After the read-through, I asked a different question — not "what haven't I
+checked" but "where would I break this if I had to". Filtering out everything a
+trusted role triggers, three zones concentrate the residual weakness:
+
+1. **The non-standard NFT lock/unlocker model** — the one thing the team had to
+   invent, so the least covered by prior industry auditing. Closed in `_update`
+   (single choke point, validates lock + bumps `ownershipNonce`).
+2. **`LoansExchange`** — the only place two untrusted parties transact. Its
+   anti-front-running property "rests on external invariants the exchange does
+   not check itself". Deslocalized defence, but it holds: `Loans.investorWithdraw`
+   forces `recipient = msg.sender` for locked loans.
+3. **NAV freshness under concurrency** — `lastNav` is cached, updated in batches,
+   via a "manual conjunction" of invalidations the team itself flags as fragile.
+
+Zones 1 and 2 were ruled out by static reading. Zone 3 cannot be — interleaving
+matters, and that only surfaces by executing. So I wrote a second invariant test
+targeting it.
+
+## Invariant fuzzing #2: share-price arbitrage
+
+Handler exposes only the untrusted vault entry points (`requestDeposit`,
+`deposit`, `requestRedeem`, `redeem`, `cancelDepositRequest`) plus a
+`pokeNav(batchSize)` with fuzzed batch size — so the fuzzer can interleave
+operations *between* NAV batches, which is where a concurrency bug would live.
+The mock calculator's loan valuation is fixed once in `setUp` and never touched,
+so any share-price movement or solvency deficit comes from vault mechanics, not
+the NAV calculation.
+
+Two properties:
+- `invariant_solvency`: idle USDC + fixed loan valuation always covers claimable
+  redemptions + pending deposits.
+- `invariant_sharePriceStable`: with the underlying valuation fixed, the share
+  price cannot drift from its initial value beyond rounding.
+Both hold. Scope note, because knowing a test's limits is part of the job: the
+mock means this does **not** exercise `NavCalculator` internals (covered by
+reading) — it exercises the vault's mechanics around the NAV, which is exactly
+the zone an attacker would probe.
+
 ## Lessons
 
 1. **A documented codebase redirects attention.** Every property `invariants.md`
@@ -100,3 +140,8 @@ zero-sum holds under 128k randomized sequences. Worth noting the `[D]` tag means
 4. **No finding is a legitimate professional result.** 31 known issues and prior
    audits mean the accessible surface is already swept. Reporting nothing beats
    reporting a duplicate or an out-of-scope trust issue.
+5. **Turn over the last stone with a tool, not an assumption.** Reading rules out
+   what you can see; the residual risk lives in interleavings you can't. Asking
+   "where would I break this" pointed at NAV concurrency, and only a fuzzer could
+   confirm it holds. Closing an audit with "no findings" is honest only once the
+   one property you couldn't read has actually been executed.
