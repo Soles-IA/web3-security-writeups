@@ -1,0 +1,23 @@
+[package]
+name = "anchor-poc-031"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "anchor_poc_031"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+
+[dependencies]
+anchor-lang = "0.31.1"
+
