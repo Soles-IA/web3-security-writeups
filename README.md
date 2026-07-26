@@ -30,6 +30,7 @@ exists.
 | Protocol | Context | Result | Writeup |
 |----------|---------|--------|---------|
 | Pump Science | Code4rena, Jan 2025 ($20K) — shadow audit | Identified M-01 (last-buy fee mismatch) independently; missed both Highs | [link](./solana/pump-science.md) |
+| WOOFi Swap | Sherlock, Sep 2024 ($21.5K) — shadow audit | Caught 2 of 4 (bump-seed DoS, init front-running); missed 2 Highs by not covering full scope | [link](./solana/woofi.md) |
 | MissionX | Solana Audit Arena Week 2 — practice | Role-separation bypass (High), duplicate-submitter griefing (Medium) | [link](./solana/missionx-practice.md) |
 | StakeFlow | Solana Audit Arena Week 1 — practice | Two executable PoCs; one vector ruled out as trust after comparing with the judge | [link](./solana/stakeflow.md) |
 
