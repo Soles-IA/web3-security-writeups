@@ -37,6 +37,10 @@ exists.
 PoCs in [`solana/poc/`](./solana/poc/) run against a local validator with
 `anchor test`.
 
+## Solana Bug Catalog
+
+A running [checklist of Solana/Anchor bug classes](./solana/bug-catalog.md) with detection signals, distilled from real contests. Read at the start of every audit.
+
 ## Methodology
 
 1. **Map the scope** — identify which actors are untrusted before reading code.
