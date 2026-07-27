@@ -48,8 +48,11 @@ so the SPL Token program can be passed in disguised. `BondingCurve::invariant`
 compares the *curve's* token account against `real_token_reserves`, so supply
 minted elsewhere leaves it untouched.
 
-**Status: not verified.** No PoC was built (the project pins Anchor 0.29 and the
-dependency graph would not resolve against my toolchain). The vector does not
+**Status: core mechanic verified** (see poc/arbitrary-cpi-signer-propagation/).
+An executable PoC confirms that a PDA signature propagates through a CPI to an
+arbitrary program, which can reuse it to `mint_to` — the exact mechanism this
+finding depends on. The distilled pattern mints attacker-controlled supply
+(0 -> 1e9). Not yet run end-to-end against Pump Science's full account set. The vector does not
 appear anywhere in the official report — not as High, Medium or Low. That is not
 proof of invalidity, since C4 only publishes confirmed findings, but with eight
 wardens filing issues as minor as URI validation, the absence suggests something
