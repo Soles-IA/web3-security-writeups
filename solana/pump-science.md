@@ -48,11 +48,25 @@ so the SPL Token program can be passed in disguised. `BondingCurve::invariant`
 compares the *curve's* token account against `real_token_reserves`, so supply
 minted elsewhere leaves it untouched.
 
-**Status: core mechanic verified** (see poc/arbitrary-cpi-signer-propagation/).
-An executable PoC confirms that a PDA signature propagates through a CPI to an
-arbitrary program, which can reuse it to `mint_to` — the exact mechanism this
-finding depends on. The distilled pattern mints attacker-controlled supply
-(0 -> 1e9). Not yet run end-to-end against Pump Science's full account set. The vector does not
+**Status: core mechanic verified; end-to-end attack NOT feasible via this path.**
+
+An executable PoC confirms PDA signature propagation through arbitrary CPI (see
+poc/arbitrary-cpi-signer-propagation/): a PDA's signature propagates to an
+arbitrary program, which can reuse it for `mint_to` (0 -> 1e9 confirmed).
+
+However, the full end-to-end attack against Pump Science's `create_bonding_curve`
+does not work, for a reason only visible when running against the real binary:
+`anchor-spl 0.29`'s `create_metadata_accounts_v3` does **not** use the
+`token_metadata_program` account from the Anchor context as the CPI target.
+Instead it constructs the instruction via `mpl_token_metadata::instructions::CreateMetadataAccountV3`
+which has Metaplex's program_id **hardcoded** in the `mpl-token-metadata` crate,
+then calls `invoke_signed` with that fixed program_id. The `token_metadata_program`
+slot in `CreateBondingCurve` is structurally unchecked but functionally irrelevant —
+anchor-spl ignores it. An attacker cannot redirect the CPI to an arbitrary program.
+
+This is the finding the report's absence suggested. The vector was well-reasoned
+but the critical detail — how anchor-spl builds the CPI internally — was only
+resolvable by running the real binary. That is exactly what a PoC is for. The vector does not
 appear anywhere in the official report — not as High, Medium or Low. That is not
 proof of invalidity, since C4 only publishes confirmed findings, but with eight
 wardens filing issues as minor as URI validation, the absence suggests something
