@@ -110,3 +110,22 @@ this pass didn't cover. **Flagged as pending, not resolved.**
    of friction.** This protocol pins Anchor 0.31.1 and Solana v2.1.21 — the
    exact versions already working from the PoC template — so this pass spent
    zero time on environment setup, for the first time this month.
+
+## Full coverage closed out
+
+Remaining 10 instructions swept: `set_treasury_vault_config`, `set_gt_factor`,
+`set_buyback_factor`, `initialize_treasury_vault_config`,
+`insert/remove_token_to_treasury_vault`, `toggle_token_flag`,
+`transfer_receiver`, `set_referral_reward`, `prepare_gt_bank`,
+`sync_gt_bank_v2`, `cancel_swap`. All follow the same sound pattern: role gate
+via `access_control` + `has_one`/`seeds` binding every account to the correct
+config/store — no loose account parameters.
+
+Two notes, neither a finding: `set_gt_factor`/`set_buyback_factor` accept a
+raw `u128` with no visible range check before persisting — trust-gated
+(`TREASURY_ADMIN`), so an unreasonable value is the role's own responsibility,
+not a third-party harm. `cancel_swap` mirrors `create_swap_v2`'s account shape
+exactly, including the same "checked by CPI" boundary into `gmsol-store` —
+consistent with the callback mechanism already flagged as pending.
+
+**`treasury` (3,008 lines, 16/16 instructions): full coverage, no findings.**
