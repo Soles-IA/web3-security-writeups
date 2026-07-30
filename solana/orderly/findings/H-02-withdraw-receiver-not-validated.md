@@ -13,7 +13,7 @@ Coincide con el issue validado de "withdrawal receiver not validated" del contes
 se agregó a `oapp_lz_receive()` una verificación de que el destinatario del retiro sea el
 `receiver` especificado en el payload — idéntico al fix que propuse.
 
-> Issue de judging: completar número exacto desde el repo
+> **Issue de judging: [#146](https://github.com/sherlock-audit/2024-09-orderly-network-solana-contract-judging/issues/146)** (Sponsor Acknowledged). Antes decía: completar desde el repo
 > `2024-09-orderly-network-solana-contract-judging`.
 
 Nota de calibración: otro watson (y4y, [issue #142](https://github.com/sherlock-audit/2024-09-orderly-network-solana-contract-judging/issues/142))
@@ -92,3 +92,25 @@ require!(
 **[L/M] Resta sin protección `token_amount - fee` (línea ~117).** El perfil de compilación no
 declara `overflow-checks = true`, por lo que en release el underflow hace *wrapping* en vez de
 panic. Recomendación: `checked_sub` con error explícito y/o activar `overflow-checks`.
+
+---
+
+## Candidatos evaluados y descartados (mismo archivo)
+
+Al leer `oapp_lz_receive` marqué dos candidatos adicionales; tras verificarlos, ninguno es un
+finding independiente. Se documentan porque descartar bien es parte del trabajo.
+
+**`deposit_token` sin constraint (línea ~56) — DESCARTADO.** Igual que en el deposit, el
+`deposit_token` del retiro no está atado a un mint canónico. Pero en el path de retiro el
+transfer va *del vault al usuario*, y ambas ATAs cuelgan del mismo `deposit_token`. Si el
+atacante pasara un mint basura, la ATA del vault para ese mint estaría vacía: no hay USDC real
+que extraer por esa vía. El vector de valor real de este archivo es el binding `user`↔`receiver`
+(H-02), no el mint. No constituye un finding separado.
+
+**`.unwrap()` en el decode del mensaje (líneas ~108, ~111) — DESCARTADO (informational).**
+`LzMessage::decode(...).unwrap()` y `AccountWithdrawSol::decode_packed(...).unwrap()` hacen panic
+ante un payload malformado. Pero el mensaje ya pasó la constraint `peer.address == params.sender`
+antes del decode, de modo que solo un peer legítimo (el EVM de Orderly) puede alcanzar esta ruta.
+Un mensaje malformado exigiría que el peer confiable enviara basura, fuera del modelo de amenaza.
+Es una nota de robustez (preferir manejo de error a panic), no una vulnerabilidad. Confirmado
+indirectamente por la calibración: ningún issue validado del reporte apunta a estos `.unwrap()`.
