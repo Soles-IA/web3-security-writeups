@@ -56,6 +56,7 @@ Solana (o retirar de Solana sin reflejarlo) rompe este invariante y es candidato
 | ID | Título | Severidad | Estado |
 |----|--------|-----------|--------|
 | [H-01](findings/H-01-deposit-mint-substitution.md) | \`deposit\` no valida el mint contra el \`token_hash\` | High | Candidato |
+| [H-02](findings/H-02-withdraw-receiver-not-validated.md) | `oapp_lz_receive` no valida `user` contra `receiver` | High | Candidato |
 
 > **Estado "Candidato":** finding identificado por revisión de código con camino de ataque
 > razonado, pendiente de (a) PoC ejecutable y (b) validación contra el reporte público de
