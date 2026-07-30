@@ -3,7 +3,23 @@
 **Contest:** Orderly Network Solana Contract (Sherlock, público — shadow audit)
 **Archivo:** `solana-vault/.../instructions/oapp_instr/oapp_lz_receive.rs`
 **Severidad:** High
-**Estado:** candidato (pendiente de validar contra el reporte público de Sherlock)
+**Estado:** ✅ Confirmado — calibrado contra el reporte oficial de Sherlock
+
+## Resultado de calibración
+
+Coincide con el issue validado de "withdrawal receiver not validated" del contest, etiquetado
+**Sponsor Confirmed / Acknowledged**. El equipo del protocolo aplicó el fix en
+[OrderlyNetwork/solana-vault PR #4](https://github.com/OrderlyNetwork/solana-vault/pull/4/commits/a9f56db5e63562df9eb6a39803f3df12b7959032):
+se agregó a `oapp_lz_receive()` una verificación de que el destinatario del retiro sea el
+`receiver` especificado en el payload — idéntico al fix que propuse.
+
+> Issue de judging: completar número exacto desde el repo
+> `2024-09-orderly-network-solana-contract-judging`.
+
+Nota de calibración: otro watson (y4y, [issue #142](https://github.com/sherlock-audit/2024-09-orderly-network-solana-contract-judging/issues/142))
+atacó el mismo archivo desde un ángulo más amplio ("falta control de acceso genérico") y quedó
+**Sponsor Disputed**. Mi framing apuntó al vector específico y correcto (binding
+`user`↔`receiver`), que es el que resultó válido.
 
 ## Resumen
 
@@ -12,12 +28,6 @@ transfiere USDC del vault a una cuenta `user` que **elige quien ejecuta la trans
 `payer`), sin verificar que esa cuenta corresponda al `receiver` indicado dentro del mensaje
 firmado. Un ejecutor malicioso puede desviar el retiro de cualquier usuario a una wallet
 propia.
-
-## Invariante / propiedad rota
-
-El mensaje de retiro autentica *qué* se retira y *para quién* (`receiver`), pero el programa
-no hace cumplir el *para quién*. Se rompe la correspondencia entre el beneficiario autorizado
-en el mensaje y el destinatario real de los fondos.
 
 ## Causa raíz
 
@@ -36,48 +46,32 @@ pub user: AccountInfo<'info>,
 pub user_deposit_wallet: Account<'info, TokenAccount>,
 \`\`\`
 
-El transfer envía los fondos a `user_deposit_wallet` (cuya autoridad es `user`):
-
-\`\`\`rust
-let cpi_accounts = Transfer {
-    from: self.vault_deposit_wallet.to_account_info(),
-    to: self.user_deposit_wallet.to_account_info(),
-    authority: self.vault_authority.to_account_info(),
-};
-\`\`\`
-
-El mensaje decodificado (`AccountWithdrawSol`) contiene un campo `receiver: [u8; 32]`, pero una
-búsqueda en todo el programa muestra que `receiver` se usa **solo** para emitir el evento
-`VaultWithdrawn`; nunca se compara contra `user`. No existe una constraint del tipo
-`user.key().to_bytes() == withdraw_params.receiver`.
-
-El `payer` que ejecuta la instrucción es un `Signer` sin restricción (cualquiera puede
-ejecutarla, típicamente un relayer), y es quien provee las cuentas `user` / `user_deposit_wallet`.
+El transfer envía los fondos a `user_deposit_wallet` (cuya autoridad es `user`). El mensaje
+decodificado contiene un campo `receiver: [u8; 32]`, pero una búsqueda en todo el programa
+muestra que `receiver` se usa **solo** para emitir el evento `VaultWithdrawn`; nunca se compara
+contra `user`. El `payer` que ejecuta es un `Signer` sin restricción (cualquiera puede
+ejecutar), y provee las cuentas `user` / `user_deposit_wallet`.
 
 ## Camino de ataque
 
 1. Alice solicita un retiro legítimo en Orderly (EVM). Se emite un mensaje LayerZero con
    `receiver = Alice`, autenticado por el `peer` correcto.
-2. El mensaje llega a Solana. La constraint de `peer` (`peer.address == params.sender`) valida
-   el origen: pasa, porque el mensaje es legítimo.
-3. El ejecutor malicioso Bob arma la transacción `oapp_lz_receive` y pasa:
-   - `user = Bob`
-   - `user_deposit_wallet = ATA de Bob para el deposit_token`
+2. El mensaje llega a Solana. La constraint de `peer` valida el origen: pasa.
+3. El ejecutor malicioso Bob arma la transacción y pasa `user = Bob` + su ATA.
 4. Como nada ata `user` a `receiver`, el transfer envía el USDC de Alice a la ATA de Bob.
 5. Bob cobra el retiro de Alice. Alice pierde sus fondos.
 
 La protección de `order_delivery` / `inbound_nonce` no mitiga esto: controla el *orden* de los
-mensajes, no *quién* recibe. El desvío funciona respetando el nonce.
+mensajes, no *quién* recibe.
 
 ## Impacto
 
 Robo directo de fondos: cualquier retiro puede ser interceptado y redirigido por quien ejecute
-la instrucción de entrega. Pérdida total de los montos en retiro.
+la instrucción de entrega.
 
 ## Mitigación recomendada
 
-Atar `user` al `receiver` del mensaje. Como el binding depende del payload (no se conoce al
-construir el struct de cuentas), validarlo dentro de `apply` tras decodificar:
+Atar `user` al `receiver` del mensaje, validándolo dentro de `apply` tras decodificar:
 
 \`\`\`rust
 require!(
@@ -86,14 +80,10 @@ require!(
 );
 \`\`\`
 
-(o la conversión de formato que corresponda entre el `receiver` de 32 bytes y el Pubkey.)
+## Clase de vulnerabilidad
 
-## Notas de calibración (shadow audit)
-
-- Verificar contra el reporte público de findings del contest: severidad asignada y número de
-  duplicados.
-- Clase: *missing account validation* — falta de binding entre un dato autenticado del payload
-  (`receiver`) y la cuenta que efectivamente recibe los fondos.
+*Missing account validation* — falta de binding entre un dato autenticado del payload
+(`receiver`) y la cuenta que efectivamente recibe los fondos.
 
 ---
 
@@ -101,7 +91,4 @@ require!(
 
 **[L/M] Resta sin protección `token_amount - fee` (línea ~117).** El perfil de compilación no
 declara `overflow-checks = true`, por lo que en release el underflow hace *wrapping* en vez de
-panic. Si el lado EVM pudiera emitir `fee > token_amount`, `amount_to_transfer` se volvería un
-valor enorme y drenaría el vault; si no, el impacto se limita a los valores que el peer pueda
-producir. Recomendación: `checked_sub` con error explícito, y/o activar `overflow-checks`.
-Severidad sujeta a si el origen puede producir `fee > token_amount`.
+panic. Recomendación: `checked_sub` con error explícito y/o activar `overflow-checks`.

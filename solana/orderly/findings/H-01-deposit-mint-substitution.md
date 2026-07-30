@@ -3,7 +3,15 @@
 **Contest:** Orderly Network Solana Contract (Sherlock, público — shadow audit)
 **Archivo:** `solana-vault/.../instructions/vault_instr/deposit.rs`
 **Severidad:** High
-**Estado:** candidato (pendiente de validar contra el reporte público de Sherlock)
+**Estado:** ✅ Confirmado — calibrado contra el reporte oficial de Sherlock
+
+## Resultado de calibración
+
+Coincide con el [issue #37](https://github.com/sherlock-audit/2024-09-orderly-network-solana-contract-judging/issues/37)
+del watson S3v3ru5, etiquetado **Sponsor Confirmed** (el sponsor reconoció el issue como
+válido). Identifiqué de forma independiente la misma causa raíz, el mismo camino de ataque y
+el mismo fix que el reporte oficial. La mitigación propuesta —agregar un constraint de anchor
+`deposit_token == allowed_token.mint_account`— coincide textualmente con la del reporte.
 
 ## Resumen
 
@@ -62,14 +70,14 @@ intención de atar el binding por mint y que quedó incompleta:
 seeds = [TOKEN_SEED, params.token_hash.as_ref()], // mint_account.key().as_ref(),
 \`\`\`
 
-## Camino de ataque (PoC conceptual)
+## Camino de ataque
 
 1. El admin registra USDC de forma legítima: `token_hash_USDC -> mint_account = USDC, allowed = true`.
 2. El atacante crea un mint propio sin valor y una ATA con saldo.
 3. El atacante llama `deposit` con:
    - `deposit_params.token_hash = token_hash_USDC`  (pasa `allowed == true`)
    - `deposit_token = <mint basura del atacante>`   (pasa: `#[account()]` sin constraint)
-   - `user_token_account` / `vault_token_account` = ATAs del mint basura (`init_if_needed` crea la del vault)
+   - `user_token_account` / `vault_token_account` = ATAs del mint basura
 4. El `transfer` mueve tokens basura al vault; el mensaje LayerZero codifica `token_hash_USDC`.
 5. El Ledger EVM acredita USDC al `account_id` del atacante.
 6. El atacante retira USDC real del sistema contra un depósito sin valor. Invariante roto.
@@ -77,7 +85,7 @@ seeds = [TOKEN_SEED, params.token_hash.as_ref()], // mint_account.key().as_ref()
 ## Impacto
 
 Pérdida directa de fondos: el atacante extrae USDC real del protocolo sin aportar valor
-equivalente. No requiere condiciones especiales de mercado ni carreras contra bots.
+equivalente. No requiere condiciones especiales de mercado.
 
 ## Mitigación recomendada
 
@@ -90,13 +98,8 @@ Atar el mint depositado al mint canónico del `token_hash` en el struct de cuent
 pub deposit_token: Box<Account<'info, Mint>>,
 \`\`\`
 
-(Alternativa: incluir `mint_account` en los seeds del PDA `allowed_token`, como sugiere el
-comentario muerto en `set_token.rs`.)
+## Clase de vulnerabilidad
 
-## Notas de calibración (shadow audit)
-
-- Verificar este candidato contra el reporte público de findings del contest en el repo de
-  `sherlock-audit`. Registrar si fue reportado, con qué severidad, y si el duplicado fue
-  numeroso (afecta el reward split).
-- Clase de vulnerabilidad: *missing account / mint validation* (la clase #1 en auditoría de
-  programas Solana).
+*Missing account / mint validation* — la clase #1 en auditoría de programas Solana: falta de
+binding entre un dato autenticado del payload (`token_hash`) y la cuenta que lo representa
+(`deposit_token`).
