@@ -4,6 +4,25 @@ A personal catalog of bug classes seen across real contests (StakeFlow, MissionX
 Pump Science, WOOFi, Orderly), with the detection signal for each. Built to be
 read at the start of every contest: for each instruction, walk this list.
 
+## Sweep order (execute this on every instruction, under the clock)
+
+Day one: list EVERY file and EVERY instruction in scope first. Then for each
+instruction, in this order:
+
+1. List every account it receives. For each: **"what binds this to being the
+   correct one?"** Nothing / a caller-controlled param → candidate (see Account
+   validation).
+2. Trace the money: which accounts move funds, and does every path consult the
+   shared accounting variable? (see State & accounting)
+3. Check every `+ - *` on untrusted values for silent overflow; every `div` for
+   who gets the remainder. (see Runtime specifics + Truncation)
+4. Identify who can call it: is the `Signer`/`payer` tied to the legitimate role
+   or endpoint? Is the check about ORIGIN or about the specific missing gate?
+5. Two-filter triage the candidate (who triggers it / is it a known issue).
+
+The first pass is breadth (every file read once); depth comes after. Both Pump
+Science Highs and 3 of 4 WOOFi findings were in files never opened on a first pass.
+
 ## The one rule that finds most Solana bugs
 
 **For every instruction, list every account it receives, and ask: "what binds
@@ -36,16 +55,21 @@ isn't validated. NOTE: some teams declare init front-running "known & acceptable
 
 **Shared signing authority + no beneficiary identity check.** A vault authority
 PDA is shared across all users, and the code verifies the *message* is valid but
-not that the *recipient* belongs to the user the message was for. *Orderly:* User A
-front-runs User B's valid withdrawal and receives B's funds. Signal: any auth that
-checks "message is legitimate" but not "the one being paid owns the message."
+not that the *recipient* belongs to the user the message was for. *Orderly #146:*
+User A front-runs User B's valid withdrawal and receives B's funds. Signal: any auth
+that checks "message is legitimate" but not "the one being paid owns the message."
 (EVM-catalog cousin: MyCut/MissionX "validate the slot but not the identity.")
 
 **Missing access control on an external-integration entrypoint.** The entrypoint
-a bridge/oracle (LayerZero, Wormhole, Pyth) calls has no gate on who can invoke it.
-*Orderly #142:* `oapp_lz_receive` callable by non-LZ addresses. Signal: any `pub fn`
-that's an entrypoint for an external protocol without a `has_one`/constraint tying
-the caller to the legitimate endpoint.
+a bridge/oracle (LayerZero, Wormhole, Pyth) calls has a gap on who can invoke it —
+but frame the EXACT gap, not the approximate one. *Orderly:* two watsons hit
+`oapp_lz_receive` from different angles. #142 framed it as "generic missing access
+control" (anyone can call apply) — Sponsor DISPUTED it, because the `peer` constraint
+DID validate message origin. The VALID finding (#146) was the specific binding gap:
+`user` not tied to the payload `receiver`, so a caller could redirect someone else's
+withdrawal. Lesson: the exact vector wins; the approximate one gets disputed. Signal:
+don't stop at "is this callable by anyone?" — ask "what specific check is missing?"
+The `peer` gate may cover origin while a per-beneficiary binding is still absent.
 
 ## State & accounting
 
@@ -77,7 +101,8 @@ insolvency* (though that one was trust-gated). WOOFi did it right: every exit ch
 **Overflow is silent in release.** Unlike Solidity 0.8 (reverts by default), Rust
 in release wraps. Look for raw `+`/`-`/`*` on values an untrusted party can push to
 the type's limit. (Inverse lesson: in Solidity, don't waste time hunting overflow —
-the compiler catches it.)
+the compiler catches it.) *Orderly:* `token_amount - fee` with no `checked_sub` and
+no `overflow-checks` in the release profile.
 
 **Frozen token account can revert a transfer.** USDC's freeze authority (Circle)
 can freeze an ATA; the Token Program reverts transfers to/from frozen accounts.
@@ -86,7 +111,9 @@ can freeze an ATA; the Token Program reverts transfers to/from frozen accounts.
 strictly by nonce and one reverts (e.g. transfer to a frozen ATA), the nonce never
 increments and every later message is permanently blocked. *Orderly #70:* attacker
 withdraws to a Circle-blacklisted account and bricks the queue. Signal: any
-ordered-by-nonce loop where one reverting element halts progress.
+ordered-by-nonce loop where one reverting element halts progress. NOTE: a nonce that
+gives ordering does NOT necessarily prevent redirection — in Orderly the
+`inbound_nonce` ordered messages but did not stop the #146 beneficiary swap.
 
 ## Anchor covers these for free (don't spend time here)
 
@@ -109,3 +136,15 @@ If unsure whether it's a bug or intended design: report as Low/Info, don't disca
 Day one: list EVERY file in scope and read each at least once BEFORE going deep on
 any. Both Pump Science Highs and 3 of 4 WOOFi findings were in files never opened.
 Coverage means the whole scope, not the whole main file.
+
+## Calibration log (what I caught vs. missed, per contest)
+
+Update after every shadow audit / contest calibration. This maps my blind spots.
+
+| Contest | Caught | Missed | Lesson |
+|---------|--------|--------|--------|
+| Orderly | H-01 mint substitution (#37), H-02 receiver binding (#146) — both Sponsor Confirmed | — | Exact-vector framing validated (#146) where the approximate framing (#142) was disputed |
+| Pump Science | M-01 last-buy fee mismatch | Both Highs (files never opened) | Coverage: read every file day one |
+| WOOFi | 2 of 4 (bump-seed DoS, init front-running) | 2 Highs (scope not fully covered) | Same coverage lesson |
+| StakeFlow | Two executable PoCs | Mediums assumed "accepted risk" | Report Low/Info when unsure, don't discard |
+| MissionX | Role-separation bypass (High), dup-submitter griefing (Medium) | — | — |
