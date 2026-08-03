@@ -33,11 +33,11 @@ exists.
 | GMX-Solana (treasury) | Immunefi live bug bounty (GMTrade) — first pass, real payout at stake | Full coverage of the 3k-line treasury program; no findings, callback-CPI mechanism flagged pending against the 38k-line core program | [link](./solana/gmx-solana-treasury.md) |
 | Pump Science | Code4rena, Jan 2025 ($20K) — shadow audit | Identified M-01 (last-buy fee mismatch) independently; missed both Highs | [link](./solana/pump-science.md) |
 | Orderly Network | Sherlock, 2024 ($27.5K) — shadow audit | Two Highs found independently (mint substitution + withdrawal receiver), both matching sponsor-confirmed issues (#37 + #146) in the official Sherlock report | [link](https://github.com/Soles-IA/web3-security-writeups/tree/main/solana/orderly) |
-| WOOFi Swap | Sherlock, Sep 2024 ($21.5K) — shadow audit | Caught 2 of 4 (bump-seed DoS, init front-running); missed 2 Highs by not covering full scope | [link](./solana/woofi.md) |
+| WOOFi Swap | Sherlock, Sep 2024 ($21.5K) — shadow audit | Caught 2 of 4 (bump-seed DoS, init front-running); missed 2 Highs by not covering full scope | [link](https://github.com/Soles-IA/web3-security-writeups/tree/main/solana/woofi) |
 | MissionX | Solana Audit Arena Week 2 — practice | Role-separation bypass (High), duplicate-submitter griefing (Medium) | [link](./solana/missionx-practice.md) |
 | StakeFlow | Solana Audit Arena Week 1 — practice | Two executable PoCs; one vector ruled out as trust after comparing with the judge | [link](./solana/stakeflow.md) |
 
-PoCs in [`solana/poc/`](./solana/poc/) run against a local validator with
+PoCs in [`solana/poc/`](./solana/poc/) target a local validator via
 `anchor test`.
 
 ## Solana Bug Catalog
