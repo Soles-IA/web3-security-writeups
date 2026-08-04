@@ -71,3 +71,37 @@ total de precio -> drenaje.
 Comparar contra findings publicos del contest (watson "g" tiene 3 findings en WOOFi Solana,
 incluyendo "attacker can control rebate managers... only 1 per quote token"). Ver si el
 wooracle-authority esta reportado y con que severidad.
+
+## FINDING (High) — rebate_manager: front-running de create -> robo de fees
+
+**Archivos:** rebate_manager/create_rebate_manager.rs, deposit_withdraw.rs, state/rebate_manager.rs
+**Severidad:** High
+**Estado:** confirmado por lectura; coincide con finding publico del watson "g".
+
+### Causa raiz
+create_rebate_manager: `authority` es Signer SIN constraint; seeds del PDA =
+[REBATEMANAGER_SEED, quote_token_mint] (solo el mint, sin identidad del creador ->
+1 rebate manager por quote token); el handler hace initialize(authority) -> el
+creador se autoasigna authority. Como es `init`, el primero que lo crea lo controla
+permanentemente.
+
+### Impacto (High)
+withdraw (deposit_withdraw.rs): constraint = rebate_manager.authority == authority
+|| admin_authority.contains(authority), y transfiere del token_vault a la wallet del
+authority. -> El atacante que hace front-run de create se vuelve authority y VACIA
+todas las rebate fees depositadas.
+
+### Cadena de ataque
+1. Atacante crea el rebate manager de USDC antes que WOOFi, se pone authority.
+2. `init` impide recrearlo -> control permanente.
+3. WOOFi deposita fees en ese vault.
+4. Atacante llama withdraw -> roba las fees.
+
+### Contraste con el candidato wooracle (descartado)
+Mismo patron "create sin gate + self-assign authority". En wooracle, create_pool lo
+contenia con has_one=authority (sin impacto). Aqui NADA lo contiene. La diferencia
+esta en la validacion aguas abajo. LECCION: seguir la cadena completa.
+
+### Fix
+Atar create_rebate_manager a un admin global, o incluir la identidad del admin en los
+seeds del PDA.
