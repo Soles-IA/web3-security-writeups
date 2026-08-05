@@ -148,3 +148,32 @@ Update after every shadow audit / contest calibration. This maps my blind spots.
 | WOOFi | 2 of 4 (bump-seed DoS, init front-running) | 2 Highs (scope not fully covered) | Same coverage lesson |
 | StakeFlow | Two executable PoCs | Mediums assumed "accepted risk" | Report Low/Info when unsure, don't discard |
 | MissionX | Role-separation bypass (High), dup-submitter griefing (Medium) | — | — |
+
+## Account-model classes (from Ackee common-attack-vectors study)
+
+**Duplicate mutable accounts.** An instruction takes 2+ mutable accounts of the SAME
+type and the logic assumes they're distinct (transfers between them, updates both).
+No constraint forces them to differ. Attacker passes the SAME account twice -> Anchor
+deserializes into two in-memory structs pointing at one on-chain account; writes clash,
+last-write-wins, breaking value conservation (e.g. mint funds from nothing in a trade).
+Signal: two `Account<'info, T>` of same T, both mut, no `key() != key()` check.
+Fix: `constraint = vault_a.key() != vault_b.key()`. (Each account passes its own checks
+individually — the bug ONLY shows when they're the same, so it's easy to miss.)
+
+**Type cosplay.** Account data is raw bytes; if two account types have the SAME byte
+size and the code deserializes without a discriminator check, one type can masquerade
+as another. Signal: manual deserialization (`try_from_slice`) on `AccountInfo` /
+`UncheckedAccount` (/// CHECK) then read as a specific type; or native (non-Anchor)
+programs. Attacker picks which struct the program thinks it's reading (e.g. controls a
+field that lands on an `authority` position). Fix: use `Account<'info, T>` — Anchor's
+8-byte discriminator makes mismatched types revert. Reflex: every AccountInfo/Unchecked
+read as data -> "could another same-size account be substituted here?"
+
+**Re-initialization (init_if_needed).** `init_if_needed` without guards lets an attacker
+call the init instruction again to overwrite an existing account's data. Signal: any
+`init_if_needed` — check whether a second call can reset critical state.
+
+**Revival attack.** A "closed" account revived because the attacker refunds its rent
+lamports in the SAME tx before garbage collection (GC runs only after tx completes).
+Signal: manual account closing that only transfers lamports without zeroing data +
+setting the closed discriminator. Connects to the Perceptron rent-not-reclaimed note.
