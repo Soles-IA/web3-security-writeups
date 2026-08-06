@@ -211,3 +211,24 @@ FALTE alguna de estas defensas, ahi esta el finding.
 - **Signer PDA via new_with_signer.** Una UncheckedAccount que es authority de una CPI NO
   es un agujero si firma como PDA con seeds fijas (new_with_signer). No se puede sustituir.
   Senal de finding: solo si esa authority se LEE como data o no esta atada a seeds/address.
+
+## Signer authorization (clase madre de control de acceso)
+
+Firmar != estar autorizado. `Signer` prueba IDENTIDAD (esta cuenta firmo), NO PERMISO
+(esta cuenta puede hacer esta accion). El bug: una instruccion modifica/mueve algo,
+tiene un Signer, pero no verifica que ese signer sea el authority/owner de la cuenta
+afectada -> cualquiera que firme opera sobre datos/fondos de otro.
+
+Senal: cuenta con campo `authority`/`owner` guardado + instruccion que la toca + NO hay
+`has_one = authority` ni `require!(x.authority == signer.key())`. El signer suelto sin
+binding al dueno es el olor.
+
+Fix: `has_one = authority` en el struct, o comparacion explicita del signer contra el
+campo owner de la cuenta.
+
+Detectado intuitivamente en varios audits previos:
+- Retiro cross-chain donde el caller no estaba atado al receiver del payload -> cualquiera
+  cobraba el retiro de otro (High).
+- Claim donde SI estaba el user == signer.key() -> defensa correcta de esta clase.
+Reflejo permanente: cada Signer que actua sobre una cuenta con dueno -> "se verifica que
+el signer ES el dueno?".
