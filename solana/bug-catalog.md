@@ -232,3 +232,35 @@ Detectado intuitivamente en varios audits previos:
 - Claim donde SI estaba el user == signer.key() -> defensa correcta de esta clase.
 Reflejo permanente: cada Signer que actua sobre una cuenta con dueno -> "se verifica que
 el signer ES el dueno?".
+
+## Ownership check
+Una cuenta (tipico: TokenAccount) usada sin verificar su owner ni su mint. Atacante
+pasa un token account malicioso propio del mismo tipo -> pasa deserializacion, engana
+la logica. Senal: TokenAccount/Account<T> sin constraints que lo aten a mint/authority
+esperados. Fix: token::mint = mint, token::authority = owner. Reflejo: "este token
+account es del mint y dueno que asumo, o me pueden pasar otro?".
+
+## Account data matching
+Instruccion que modifica/actua sobre una cuenta sin verificar que sea LA cuenta correcta
+con los datos esperados. Primo de signer auth pero enfocado en QUE cuenta se toca (no
+quien firma). Senal: cuenta modificada sin has_one/seeds/comparacion que la ate al
+contexto. Reflejo: "es LA cuenta correcta, o cualquiera del tipo pasa?".
+Nota: el mint substitution (deposito de mint no validado contra allowed_token.mint) es un
+caso de esta clase — ya cazado en la practica (Orderly H-01).
+
+## PDA privileges
+Un PDA firma una accion privilegiada (transfer/mint/withdraw) pero no se verifica que el
+CALLER tenga derecho a usar ESE PDA. Si las seeds del PDA no incluyen la identidad del
+dueno, un atacante usa el PDA de otro para autorizar acciones sobre fondos ajenos. Senal:
+PDA que firma via new_with_signer/invoke_signed donde las seeds NO incluyen la key del
+usuario dueno, o no se valida al caller. Fix: incluir owner.key() en las seeds, o has_one.
+Distincion fina con signer auth: signer auth = "el que firma es el dueno?"; pda privileges
+= "el caller tiene derecho a usar este PDA que firma por el?".
+Nota: un mint_authority PDA con seeds fijas de config (uno global, no por usuario) NO
+sufre esto — es PDA de sistema. El bug aplica cuando el PDA deberia ser por-usuario.
+
+---
+## Cobertura Ackee: 11/11 clases estudiadas
+duplicate-mutable, type-cosplay, re-initialization, revival, account-reloading,
+arbitrary-cpi, signer-authorization, ownership-check, account-data-matching,
+pda-privileges, initialization-frontrunning (esta ultima = el High de rebate_manager).
