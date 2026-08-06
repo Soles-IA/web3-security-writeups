@@ -177,3 +177,37 @@ call the init instruction again to overwrite an existing account's data. Signal:
 lamports in the SAME tx before garbage collection (GC runs only after tx completes).
 Signal: manual account closing that only transfers lamports without zeroing data +
 setting the closed discriminator. Connects to the Perceptron rent-not-reclaimed note.
+
+## Defensa modelo: como se ve un sistema de rewards/emision bien construido
+
+Referencia de "como deberia ser". Cuando audites un protocolo de rewards/minting y
+FALTE alguna de estas defensas, ahi esta el finding.
+
+- **Solvencia con doble guard.** No alcanza con un contador. Un sistema robusto verifica
+  (a) la contabilidad: next_allocated <= pool y next_claimed <= pool, Y ADEMAS
+  (b) el balance real del vault antes de transferir: vault.amount >= amount. El primero
+  protege la logica; el segundo protege contra desincronizacion contador-vs-real.
+  Senal de finding: si solo hay contador y no se chequea el balance real (o viceversa).
+
+- **Espacio de cuentas con InitSpace + test.** Los structs usan #[derive(InitSpace)] y
+  LEN = 8 + INIT_SPACE (nunca tamanos hardcodeados), con un test que serializa la cuenta
+  con valores MAX y compara contra INIT_SPACE. Senal de finding: space = <numero
+  hardcodeado> sin test -> puede estar mal calculado (over/under-allocation).
+
+- **Pesos/porcentajes normalizados y acotados.** Cuando un input define proporciones,
+  validar que cada uno este en rango Y que la suma sea exactamente la escala
+  (total == SCALE). Senal: si los pesos no se validan a sumar la escala, el total puede
+  inflarse y romper la proporcionalidad del reparto.
+
+- **Leer-antes-de-CPI (evita account reloading bug).** Patron correcto: leer el balance/
+  campo ANTES de la CPI que lo modifica, actuar con el valor local, y NO releer despues.
+  Si un programa lee vault.amount DESPUES de un mint_to/transfer sin .reload(), usa datos
+  viejos. Senal de finding: lectura de cuenta modificada post-CPI sin reload.
+
+- **Programa objetivo de CPI fijado por tipo.** token_program: Program<'info, Token>
+  (no AccountInfo) hace que Anchor valide el program ID. Senal de finding (arbitrary CPI):
+  CPI cuyo programa objetivo viene de un AccountInfo/Unchecked sin address=.
+
+- **Signer PDA via new_with_signer.** Una UncheckedAccount que es authority de una CPI NO
+  es un agujero si firma como PDA con seeds fijas (new_with_signer). No se puede sustituir.
+  Senal de finding: solo si esa authority se LEE como data o no esta atada a seeds/address.
