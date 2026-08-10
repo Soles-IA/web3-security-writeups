@@ -264,3 +264,36 @@ sufre esto — es PDA de sistema. El bug aplica cuando el PDA deberia ser por-us
 duplicate-mutable, type-cosplay, re-initialization, revival, account-reloading,
 arbitrary-cpi, signer-authorization, ownership-check, account-data-matching,
 pda-privileges, initialization-frontrunning (esta ultima = el High de rebate_manager).
+
+## Verificacion de firma custom (ed25519 introspection)
+
+Muchos protocolos verifican firmas off-chain (attesters, oraculos, autorizadores) usando
+introspeccion de la instruccion ed25519 nativa. Es una clase rica en bugs. Que revisar:
+
+1. **Offsets validados contra valores FIJOS.** La instruccion ed25519 usa offsets para
+   ubicar pubkey/sig/msg. El programa DEBE chequear cada offset contra el valor esperado
+   (pk_offset, sig_offset, msg_offset) y que ix_idx == 0xFFFF (misma instruccion). Si algun
+   offset queda sin validar -> bug "wrong offset": el atacante arma una ix ed25519 que
+   verifica una firma sobre datos que el controla, mientras el programa cree que verifico
+   otra cosa. (Clase documentada por Cantina/asymmetric.re en protocolos reales.)
+
+2. **Contenido comparado byte-a-byte.** No basta validar offsets: hay que comparar
+   data_pubkey == expected_signer, data_signature == expected_sig, data_message ==
+   expected_msg. Sin esto, se verifica "una firma valida" pero no LA que corresponde.
+
+3. **Que parametros cubre el mensaje firmado.** El bug mas comun: el mensaje firmado NO
+   incluye todos los params criticos de la operacion (amount, destinatario, order_id,
+   asset, chain). Los que quedan fuera son manipulables por el caller manteniendo la firma
+   valida -> equivalente al Orderly H-02 (receiver no atado al payload) en version firma.
+   Chequear: cada campo que se usa/emite aguas abajo, esta en el mensaje firmado?
+
+4. **Nonce anti-replay.** La dedup de firmas de Solana es PER-SLOT: la misma firma ed25519
+   se puede reusar en una tx nueva con blockhash fresco (la firma es sobre el MENSAJE, no
+   la tx). Si no hay nonce/tracking on-chain de firmas usadas, hay replay. Buscar: existe un
+   nonce en el config/estado, o un registro de firmas consumidas? Si la unica barrera es un
+   PDA que se cierra (init/close), puede recrearse -> replay.
+
+5. **Quien puede disparar la funcion.** Clave para severidad: si la funcion que verifica la
+   firma tambien requiere un rol trusted (manager:Signer), un externo no puede dispararla
+   aunque tenga una firma valida -> el bug de firma queda gated por el rol. El vector externo
+   real solo existe si un no-privilegiado puede invocar la verificacion.
